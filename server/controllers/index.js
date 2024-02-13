@@ -4,22 +4,37 @@ const models = require('../models');
 // get the Cat model
 const { Cat } = models;
 
-// default fake data so that we have something to work with until we make a real Cat
-const defaultData = {
-  name: 'unknown',
-  bedsOwned: 0,
-};
-
-// object for us to keep track of the last Cat we made and dynamically update it sometimes
-let lastAdded = new Cat(defaultData);
-
 // Function to handle rendering the index page.
-const hostIndex = (req, res) => {
+const hostIndex = async (req, res) => {
+  //Start with the name as unknown
+  let name = 'unknown';
+
+  try{
+    /* Cat.findOne() will find a cat that matches the query given to it as the first parameter.
+       In this case, we give it an empty object so it will match against any object it finds.
+       The second parameter is essentially a filter for the values we want. This works similarly
+       to the .select() function. The third parameter is the general options object. Here we
+       are passing in an options object with a "sort" key which tells Mongo to sort the data
+       before sending anything back. We then specifically tell it to sort by the created date
+       in descending order (so that more recent things are "on the top"). Since we are only
+       finding one, this query will either find the most recent cat if it exists, or nothing.
+    */
+    const doc = await Cat.findOne({}, {}, { sort: {'createdDate': 'descending'}}).lean().exec();
+
+    //If we did get a cat back, store it's name in the name variable.
+    if(doc) {
+      name = doc.name;
+    }
+  } catch (err) {
+    //Just log out the error for our records.
+    console.log(err);
+  }
+
   /* res.render will render the given view from the views folder. In this case, index.
      We pass it a number of variables to populate the page.
   */
   res.render('index', {
-    currentName: lastAdded.name,
+    currentName: name,
     title: 'Home',
     pageName: 'Home Page',
   });
@@ -84,7 +99,28 @@ const hostPage3 = (req, res) => {
 };
 
 // Get name will return the name of the last added cat.
-const getName = (req, res) => res.json({ name: lastAdded.name });
+const getName = async (req, res) => {
+  try{
+    /* Here we are utilizing the exact same syntax we used in the host index function
+       to get the most recently added cat. Then if we find an existing cat we send
+       back that cats name with a 200 status code. If we don't find a cat (ie doc is
+       null or undefined) we send back a 404 because there was no cat found.
+    */
+    const doc = await Cat.findOne({}, {}, { sort: {'createdDate': 'descending'}}).lean().exec();
+
+    //If we did get a cat back, store it's name in the name variable.
+    if(doc) {
+      return res.json({name: doc.name});
+    }
+    return res.status(404).json({error: 'No cat found'});
+  } catch (err) {
+    /* If an error occurs, it means something went wrong with the database. We will
+       give the user a 500 internal server error status code and an error message.
+    */
+    console.log(err);
+    return res.status(500).json({error: 'Something went wrong contacting the database'});
+  }
+}
 
 // Function to create a new cat in the database
 const setName = async (req, res) => {
@@ -140,13 +176,11 @@ const setName = async (req, res) => {
   }
 
   /* After our await has resolved, and if no errors have occured during the await, we will end
-     up here. We will update our lastAdded cat to the one we just added. We will then send that
-     cat's data to the client.
+     up here. We will then send that cat's data to the client.
   */
-  lastAdded = newCat;
   return res.json({
-    name: lastAdded.name,
-    beds: lastAdded.bedsOwned,
+    name: newCat.name,
+    beds: newCat.bedsOwned,
   });
 };
 
@@ -203,32 +237,34 @@ const searchName = async (req, res) => {
    it. For this example we will just update the last one we added for simplicity.
 */
 const updateLast = (req, res) => {
-  // First we will update the number of bedsOwned.
-  lastAdded.bedsOwned++;
+  /* We want to increase the number of beds owned by the most recently added cat.
+     To accomplish this we need to use the findOneAndUpdate function. The first
+     parameter is the query. Since we need to sort the results to find the most
+     recently added cat we want an empty query so that it can find all of the cats.
 
-  /* Remember that lastAdded is a Mongoose document (made on line 14 if no new
-     ones were made after the server started, or line 116 if there was). Mongo
-     documents have an _id, which is a globally unique identifier that distinguishes
-     them from other documents. Our mongoose document also has this _id. When we
-     call .save() on a document, Mongoose and Mongo will use the _id to determine if
-     we are creating a new database entry (if the _id doesn't already exist), or
-     if we are updating an existing entry (if the _id is already in the database).
+     The second parameter is the actual update. Usually this would just be an unnested
+     object like {'bedsOwned': 1}. However this will set the cat's bedsowned to 1, not
+     increase it. So instead we need to use the Mongo macro $inc as a key to another
+     object. Essentially this says "everything defined in this subobject is an increment
+     not a set". So {$inc: {'bedsOwned': 1}} says "increase the beds owned by 1".
 
-     Since lastAdded is likely already in the database, .save() will update it rather
-     than make a new cat.
+     Finally, findOneAndUpdate would just update the most recent cat it finds that
+     matches the query (which could be any cat). So we also need to tell Mongoose to
+     sort all the cats in descending order by created date so that we update the
+     most recently added one.
 
      We can use async/await for this, or just use standard promise .then().catch() syntax.
   */
-  const savePromise = lastAdded.save();
+  const updatePromise = Cat.findOneAndUpdate({}, {$inc: {'bedsOwned': 1}}, { sort: {'createdDate': 'descending'}}).lean().exec();;
 
   // If we successfully save/update them in the database, send back the cat's info.
-  savePromise.then(() => res.json({
-    name: lastAdded.name,
-    beds: lastAdded.bedsOwned,
+  updatePromise.then((doc) => res.json({
+    name: doc.name,
+    beds: doc.bedsOwned,
   }));
 
   // If something goes wrong saving to the database, log the error and send a message to the client.
-  savePromise.catch((err) => {
+  updatePromise.catch((err) => {
     console.log(err);
     return res.status(500).json({ error: 'Something went wrong' });
   });
