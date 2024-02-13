@@ -6,10 +6,10 @@ const { Cat } = models;
 
 // Function to handle rendering the index page.
 const hostIndex = async (req, res) => {
-  //Start with the name as unknown
+  // Start with the name as unknown
   let name = 'unknown';
 
-  try{
+  try {
     /* Cat.findOne() will find a cat that matches the query given to it as the first parameter.
        In this case, we give it an empty object so it will match against any object it finds.
        The second parameter is essentially a filter for the values we want. This works similarly
@@ -19,14 +19,14 @@ const hostIndex = async (req, res) => {
        in descending order (so that more recent things are "on the top"). Since we are only
        finding one, this query will either find the most recent cat if it exists, or nothing.
     */
-    const doc = await Cat.findOne({}, {}, { sort: {'createdDate': 'descending'}}).lean().exec();
+    const doc = await Cat.findOne({}, {}, { sort: { createdDate: 'descending' } }).lean().exec();
 
-    //If we did get a cat back, store it's name in the name variable.
-    if(doc) {
+    // If we did get a cat back, store it's name in the name variable.
+    if (doc) {
       name = doc.name;
     }
   } catch (err) {
-    //Just log out the error for our records.
+    // Just log out the error for our records.
     console.log(err);
   }
 
@@ -100,27 +100,27 @@ const hostPage3 = (req, res) => {
 
 // Get name will return the name of the last added cat.
 const getName = async (req, res) => {
-  try{
+  try {
     /* Here we are utilizing the exact same syntax we used in the host index function
        to get the most recently added cat. Then if we find an existing cat we send
        back that cats name with a 200 status code. If we don't find a cat (ie doc is
        null or undefined) we send back a 404 because there was no cat found.
     */
-    const doc = await Cat.findOne({}, {}, { sort: {'createdDate': 'descending'}}).lean().exec();
+    const doc = await Cat.findOne({}, {}, { sort: { createdDate: 'descending' } }).lean().exec();
 
-    //If we did get a cat back, store it's name in the name variable.
-    if(doc) {
-      return res.json({name: doc.name});
+    // If we did get a cat back, store it's name in the name variable.
+    if (doc) {
+      return res.json({ name: doc.name });
     }
-    return res.status(404).json({error: 'No cat found'});
+    return res.status(404).json({ error: 'No cat found' });
   } catch (err) {
     /* If an error occurs, it means something went wrong with the database. We will
        give the user a 500 internal server error status code and an error message.
     */
     console.log(err);
-    return res.status(500).json({error: 'Something went wrong contacting the database'});
+    return res.status(500).json({ error: 'Something went wrong contacting the database' });
   }
-}
+};
 
 // Function to create a new cat in the database
 const setName = async (req, res) => {
@@ -162,9 +162,14 @@ const setName = async (req, res) => {
        now has is a .save() function. This function will intelligently add or update the cat in
        the database. Since we have never saved this cat before, .save() will create a new cat in
        the database. All calls to the database are async, including .save() so we will await the
-       databases response. If something goes wrong, we will end up in our catch() statement.
+       databases response. If something goes wrong, we will end up in our catch() statement. If
+       not, we will return a 201 to the user with the cat info.
     */
     await newCat.save();
+    return res.status(201).json({
+      name: newCat.name,
+      beds: newCat.bedsOwned,
+    });
   } catch (err) {
     /* If something goes wrong while communicating with the database, log the error and send
        an error message back to the client. Note that our return will return us from the setName
@@ -174,14 +179,6 @@ const setName = async (req, res) => {
     console.log(err);
     return res.status(500).json({ error: 'failed to create cat' });
   }
-
-  /* After our await has resolved, and if no errors have occured during the await, we will end
-     up here. We will then send that cat's data to the client.
-  */
-  return res.json({
-    name: newCat.name,
-    beds: newCat.bedsOwned,
-  });
 };
 
 // Function to handle searching a cat by name.
@@ -224,7 +221,7 @@ const searchName = async (req, res) => {
 
   // If we do not find something that matches our search, doc will be empty.
   if (!doc) {
-    return res.json({ error: 'No cats found' });
+    return res.status(404).json({ error: 'No cats found' });
   }
 
   // Otherwise, we got a result and will send it back to the user.
@@ -255,7 +252,7 @@ const updateLast = (req, res) => {
 
      We can use async/await for this, or just use standard promise .then().catch() syntax.
   */
-  const updatePromise = Cat.findOneAndUpdate({}, {$inc: {'bedsOwned': 1}}, { sort: {'createdDate': 'descending'}}).lean().exec();;
+  const updatePromise = Cat.findOneAndUpdate({}, { $inc: { bedsOwned: 1 } }, { sort: { createdDate: 'descending' } }).lean().exec();
 
   // If we successfully save/update them in the database, send back the cat's info.
   updatePromise.then((doc) => res.json({
