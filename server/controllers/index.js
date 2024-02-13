@@ -6,10 +6,10 @@ const { Cat } = models;
 
 // Function to handle rendering the index page.
 const hostIndex = async (req, res) => {
-  // Start with the name as unknown
+  //Start with the name as unknown
   let name = 'unknown';
 
-  try {
+  try{
     /* Cat.findOne() will find a cat that matches the query given to it as the first parameter.
        In this case, we give it an empty object so it will match against any object it finds.
        The second parameter is essentially a filter for the values we want. This works similarly
@@ -19,14 +19,16 @@ const hostIndex = async (req, res) => {
        in descending order (so that more recent things are "on the top"). Since we are only
        finding one, this query will either find the most recent cat if it exists, or nothing.
     */
-    const doc = await Cat.findOne({}, {}, { sort: { createdDate: 'descending' } }).lean().exec();
+    const doc = await Cat.findOne({}, {}, { 
+      sort: {'createdDate': 'descending'}
+    }).lean().exec();
 
-    // If we did get a cat back, store it's name in the name variable.
-    if (doc) {
+    //If we did get a cat back, store it's name in the name variable.
+    if(doc) {
       name = doc.name;
     }
   } catch (err) {
-    // Just log out the error for our records.
+    //Just log out the error for our records.
     console.log(err);
   }
 
@@ -100,27 +102,29 @@ const hostPage3 = (req, res) => {
 
 // Get name will return the name of the last added cat.
 const getName = async (req, res) => {
-  try {
+  try{
     /* Here we are utilizing the exact same syntax we used in the host index function
        to get the most recently added cat. Then if we find an existing cat we send
        back that cats name with a 200 status code. If we don't find a cat (ie doc is
        null or undefined) we send back a 404 because there was no cat found.
     */
-    const doc = await Cat.findOne({}, {}, { sort: { createdDate: 'descending' } }).lean().exec();
+    const doc = await Cat.findOne({}, {}, { 
+      sort: {'createdDate': 'descending'}
+    }).lean().exec();
 
-    // If we did get a cat back, store it's name in the name variable.
-    if (doc) {
-      return res.json({ name: doc.name });
+    //If we did get a cat back, store it's name in the name variable.
+    if(doc) {
+      return res.json({name: doc.name});
     }
-    return res.status(404).json({ error: 'No cat found' });
+    return res.status(404).json({error: 'No cat found'});
   } catch (err) {
     /* If an error occurs, it means something went wrong with the database. We will
        give the user a 500 internal server error status code and an error message.
     */
     console.log(err);
-    return res.status(500).json({ error: 'Something went wrong contacting the database' });
+    return res.status(500).json({error: 'Something went wrong contacting the database'});
   }
-};
+}
 
 // Function to create a new cat in the database
 const setName = async (req, res) => {
@@ -248,11 +252,16 @@ const updateLast = (req, res) => {
      Finally, findOneAndUpdate would just update the most recent cat it finds that
      matches the query (which could be any cat). So we also need to tell Mongoose to
      sort all the cats in descending order by created date so that we update the
-     most recently added one.
+     most recently added one. The returnDocument key with the 'after' value tells 
+     mongoose to give us back the version of the document AFTER the changes. Otherwise
+     it will default to 'before' which gives us the document before the update.
 
      We can use async/await for this, or just use standard promise .then().catch() syntax.
   */
-  const updatePromise = Cat.findOneAndUpdate({}, { $inc: { bedsOwned: 1 } }, { sort: { createdDate: 'descending' } }).lean().exec();
+  const updatePromise = Cat.findOneAndUpdate({}, {$inc: {'bedsOwned': 1}}, {
+    returnDocument: 'after', //Populates doc in the .then() with the version after update
+    sort: {'createdDate': 'descending'}
+  }).lean().exec();
 
   // If we successfully save/update them in the database, send back the cat's info.
   updatePromise.then((doc) => res.json({
