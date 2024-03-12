@@ -103,14 +103,14 @@ const hostPage3 = (req, res) => {
 // Get name will return the name of the last added cat.
 const getName = async (req, res) => {
   try{
-    /* Here we are utilizing the exact same syntax we used in the host index function
-       to get the most recently added cat. Then if we find an existing cat we send
-       back that cats name with a 200 status code. If we don't find a cat (ie doc is
-       null or undefined) we send back a 404 because there was no cat found.
+    /* Here we are trying to do the exact same thing we did in host index up
+       above. We want to find the most recently added cat. The only difference
+       here is that we are using the query .sort() function rather than passing
+       the sort in as a part of the 3rd parameter options object. Both work
+       functionally the same. We are just seeing that it can be written in
+       more than one way.
     */
-    const doc = await Cat.findOne({}, {}, { 
-      sort: {'createdDate': 'descending'}
-    }).lean().exec();
+    const doc = await Cat.findOne({}).sort({'createdDate': 'descending'}).lean().exec();
 
     //If we did get a cat back, store it's name in the name variable.
     if(doc) {
